@@ -74,6 +74,84 @@ class Generator(nn.Module):
 
         return samples
 
+    # NEW FUNCTION
+    def sample_rollout_init(self, num_samples):
+        """
+        Initializes the sequence.
+        """
+        
+        samples = torch.zeros(num_samples, 1).type(torch.LongTensor)
+
+        h = self.init_hidden(num_samples)
+        inp = autograd.Variable(torch.LongTensor([0]*num_samples))
+
+        if self.gpu:
+            samples = samples.cuda()
+            inp = inp.cuda()
+
+        out, h = self.forward(inp, h)               # out: num_samples x vocab_size
+        out = torch.multinomial(torch.exp(out), 1)  # num_samples x 1 (sampling from each row)
+        samples[:, 0] = out.data
+
+        inp = out.view(-1)
+
+        return samples        
+
+    # NEW FUNCTION
+    def sample_rollout(self, num_samples, previous_seq, position):
+        """
+        Adds one token to the sequence being generated
+        """
+        samples = torch.zeros(num_samples, position+1).type(torch.LongTensor)
+        samples[:, 0:position] = previous_seq
+
+        h = self.init_hidden(num_samples)
+        inp = autograd.Variable(torch.LongTensor([0]*num_samples))
+
+        if self.gpu:
+            samples = samples.cuda()
+            inp = inp.cuda()
+
+        out, h = self.forward(inp, h)               # out: num_samples x vocab_size
+        out = torch.multinomial(torch.exp(out), 1)  # num_samples x 1 (sampling from each row)
+        samples[:, -1] = out.data
+
+        inp = out.view(-1)
+
+        return samples
+
+    # NEW FUNCTION
+    def mc(self, samples, position, start_letter = 0, gpu=False):
+        """
+        Finishes the current sequence being generated with a Monte Carlo sampling from the Generator.
+        """
+
+        batch_size, current_seq_len = samples.size()
+
+        inp = torch.zeros(batch_size, self.max_seq_len)
+        target = torch.zeros(batch_size, self.max_seq_len)
+        target[:, 0:current_seq_len] = samples
+        inp[:, 0] = start_letter
+        inp[:, 1:current_seq_len+1] = target[:, :current_seq_len]
+
+        inp = autograd.Variable(inp).type(torch.LongTensor)
+        target = autograd.Variable(target).type(torch.LongTensor)
+
+        if self.gpu:
+            inp = inp.cuda()
+            target = target.cuda()
+
+        h = self.init_hidden(batch_size)
+
+        for i in range(current_seq_len, self.max_seq_len):
+            out, h = self.forward(inp[:,i],h)
+            out = torch.multinomial(torch.exp(out), 1)
+            target[:, i] = out.data
+            if i < self.max_seq_len-1:
+                inp[:, i+1] = out.data
+
+        return inp, target
+
     def batchNLLLoss(self, inp, target):
         """
         Returns the NLL Loss for predicting target sequence.
