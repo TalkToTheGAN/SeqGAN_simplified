@@ -102,7 +102,7 @@ def train_generator_PG_rollout(gen, gen_opt, oracle, dis, num_batches):
     """
 
     for batch in range(num_batches):
-        seq = gen.sample_rollout_init(BATCH_SIZE*2)
+        seq, h = gen.sample_rollout_init(BATCH_SIZE*2)
         for t in range(1,MAX_SEQ_LEN): 
             loss = 0
             for n in range(MC_SIZE):
@@ -114,7 +114,7 @@ def train_generator_PG_rollout(gen, gen_opt, oracle, dis, num_batches):
             gen_opt.zero_grad()
             loss.backward()
             gen_opt.step()
-            seq = gen.sample_rollout(BATCH_SIZE*2, seq, t)
+            seq, h = gen.sample_rollout(BATCH_SIZE*2, seq, h, t)
 
     # sample from generator and compute oracle NLL
     oracle_loss = helpers.batchwise_oracle_nll(gen, oracle, POS_NEG_SAMPLES, BATCH_SIZE, MAX_SEQ_LEN, start_letter=START_LETTER, gpu=CUDA)
@@ -209,7 +209,8 @@ if __name__ == '__main__':
         # TRAIN GENERATOR
         print('\nAdversarial Training Generator : ', end='')
         sys.stdout.flush()
-        train_generator_PG_rollout(gen, gen_optimizer, oracle, dis, 1)
+        # train_generator_PG(gen, gen_optimizer, oracle, dis, 1) #choose this for the simplified version without MC sampling at each token generation
+        train_generator_PG_rollout(gen, gen_optimizer, oracle, dis, 1) 
 
         # TRAIN DISCRIMINATOR
         print('\nAdversarial Training Discriminator : ')

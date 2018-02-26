@@ -95,18 +95,17 @@ class Generator(nn.Module):
 
         inp = out.view(-1)
 
-        return samples        
+        return samples, h        
 
     # NEW FUNCTION
-    def sample_rollout(self, num_samples, previous_seq, position):
+    def sample_rollout(self, num_samples, previous_seq, h, position):
         """
         Adds one token to the sequence being generated
         """
         samples = torch.zeros(num_samples, position+1).type(torch.LongTensor)
         samples[:, 0:position] = previous_seq
 
-        h = self.init_hidden(num_samples)
-        inp = autograd.Variable(torch.LongTensor([0]*num_samples))
+        inp = autograd.Variable(torch.LongTensor(samples[:,-1]))
 
         if self.gpu:
             samples = samples.cuda()
@@ -118,7 +117,7 @@ class Generator(nn.Module):
 
         inp = out.view(-1)
 
-        return samples
+        return samples, h
 
     # NEW FUNCTION
     def mc(self, samples, position, start_letter = 0, gpu=False):
